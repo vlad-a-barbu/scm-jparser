@@ -48,6 +48,8 @@ Vlad A. Barbu - 2 Nov 2024
 ;; @reducer - a function that accepts a state and a character and yields a new state or #f
 ;; @state - the initial state
 (define (string-reduce iterator reducer state)
+  (unless (procedure? reducer)
+    (error 'string-reduce "reducer must be a procedure"))
   (let* ((res (iterator))
 	 (char (car res))
 	 (pos (cdr res)))
@@ -59,12 +61,15 @@ Vlad A. Barbu - 2 Nov 2024
 	(cons state pos))
     ))
 
-(define digit-accumulator
-  (lambda (acc char)
-    (if (char-numeric? char)
-        (string-append acc (string char))
-        #f)))
-
+(define (string-skip-while pred)
+  (lambda (iterator)
+    (let loop ()
+      (let* ((res (iterator))
+             (char (car res))
+             (pos (cdr res)))
+        (if (and char (pred char))
+            (loop)
+            pos)))))
 
 (define (string-take-while pred)
   (lambda (iterator)
@@ -77,5 +82,27 @@ Vlad A. Barbu - 2 Nov 2024
 
 ;; string-take-while demo
 ((string-take-while (lambda (c) (char=? c #\a))) (string-make-iterator "aaabbb" 0))
+;; string-skip-while demo
+((string-skip-while (lambda (c) (char=? c #\space))) (string-make-iterator "   aaabbb" 0))
 
 
+
+;;; other stuff
+
+(define digit-accumulator
+  (lambda (acc char)
+    (if (char-numeric? char)
+        (string-append acc (string char))
+        #f)))
+
+(define (char-one-of chars)
+  (lambda (c)
+    (member c chars)))
+
+(define (char-none-of chars)
+  (lambda (c)
+    (not (member c chars))))
+
+(define (pred-or . preds)
+  (lambda (c)
+    (any (lambda (p) (p c)) preds)))
