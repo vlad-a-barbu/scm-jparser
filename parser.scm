@@ -1,18 +1,81 @@
-(define (make-char-at str)
-  (let ((len (string-length str)))
-    (lambda (pos)
-      (if (>= pos len)
-	  #f
-	  (string-ref str pos)))))
+#|
 
-(define (make-char-it str)
-  (let ((char-at (make-char-at str))
-	(pos 0))
-    (lambda ()
-      (begin
-	(set! pos (+ pos 1))
-	(char-at (- pos 1))))))
+Vlad A. Barbu - 2 Nov 2024
 
-(define it (make-char-it "hello"))
+- a collection of simple text parsing utilities
+- developed with ChezScheme (build src @ 95ee804d741e5af9c41f59145b4f42877fa35ae5)
+
+|#
+
+
+
+;; yields a pair of (char pos) or (#f len) when the traversal is completed
+;; @str - the string value to be traversed
+;; @start - the start index
+(define (string-make-iterator str start)
+  (unless (and (>= start 0) (<= start (string-length str)))
+    (error 'string-make-iterator "invalid start position"))
+  (let ((len (string-length str))
+	(pos start))
+    (lambda () (if (= pos len)
+	      (cons #f len)
+	      (let ((char (string-ref str pos))
+		    (char-pos pos))
+		(begin
+		  (set! pos (+ pos 1))
+		  (cons char char-pos)))))
+    ))
+
+;; string-make-iterator demo
+(define (demo-string-make-iterator it)
+  (let* ((res (it))
+	 (char (car res))
+	 (pos (cdr res)))
+    (if char
+	(begin
+	  (display (format "[~s] ~s" pos char))
+	  (newline)
+	  (demo-string-make-iterator it)))
+    #f))
+(demo-string-make-iterator (string-make-iterator "some random text" 0))
+
+
+
+;; accumulates the chars yielded by a string iterator into a state shaped by a given reducer function
+;; the accumulation process ends when the reducer does not accept a given character
+;; a list of the accumulated state and the last iterated position is returned
+;; @iterator - the string iterator
+;; @reducer - a function that accepts a state and a character and yields a new state or #f
+;; @state - the initial state
+(define (string-reduce iterator reducer state)
+  (let* ((res (iterator))
+	 (char (car res))
+	 (pos (cdr res)))
+    (if char
+	(let ((next-state (reducer state char)))
+	  (if next-state
+	      (string-reduce iterator reducer next-state)
+	      (cons state pos)))
+	(cons state pos))
+    ))
+
+(define digit-accumulator
+  (lambda (acc char)
+    (if (char-numeric? char)
+        (string-append acc (string char))
+        #f)))
+
+
+(define (string-take-while pred)
+  (lambda (iterator)
+    (string-reduce iterator 
+                   (lambda (acc char)
+                     (if (pred char)
+                         (string-append acc (string char))
+                         #f))
+                   "")))
+
+;; string-take-while demo
+((string-take-while (lambda (c) (char=? c #\a))) (string-make-iterator "aaabbb" 0))
 
 
