@@ -1,0 +1,10 @@
+(define (make-char-at str len)
+  (lambda (pos))
+  (if (eq? len pos)
+      #f
+      (string-ref str pos)))
+
+(define (make-next str len)
+  )
+
+(define (parse-int  ))
