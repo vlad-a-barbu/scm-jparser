@@ -18,13 +18,12 @@ Vlad A. Barbu - 2 Nov 2024
   (let ((len (string-length str))
 	(pos start))
     (lambda () (if (= pos len)
-	      (cons #f len)
-	      (let ((char (string-ref str pos))
-		    (char-pos pos))
-		(begin
-		  (set! pos (+ pos 1))
-		  (cons char char-pos)))))
-    ))
+		   (cons #f len)
+		   (let ((char (string-ref str pos))
+			 (char-pos pos))
+		     (begin
+		       (set! pos (+ pos 1))
+		       (cons char char-pos)))))))
 
 ;; string-make-iterator demo
 (define (demo-string-make-iterator it)
@@ -37,6 +36,7 @@ Vlad A. Barbu - 2 Nov 2024
 	  (newline)
 	  (demo-string-make-iterator it)))
     #f))
+
 (demo-string-make-iterator (string-make-iterator "some random text" 0))
 
 
@@ -58,51 +58,38 @@ Vlad A. Barbu - 2 Nov 2024
 	  (if next-state
 	      (string-reduce iterator reducer next-state)
 	      (cons state pos)))
-	(cons state pos))
-    ))
-
-(define (string-skip-while pred)
-  (lambda (iterator)
-    (let loop ()
-      (let* ((res (iterator))
-             (char (car res))
-             (pos (cdr res)))
-        (if (and char (pred char))
-            (loop)
-            pos)))))
-
-(define (string-take-while pred)
-  (lambda (iterator)
-    (string-reduce iterator 
-                   (lambda (acc char)
-                     (if (pred char)
-                         (string-append acc (string char))
-                         #f))
-                   "")))
-
-;; string-take-while demo
-((string-take-while (lambda (c) (char=? c #\a))) (string-make-iterator "aaabbb" 0))
-;; string-skip-while demo
-((string-skip-while (lambda (c) (char=? c #\space))) (string-make-iterator "   aaabbb" 0))
+	(cons state pos))))
 
 
 
-;;; other stuff
+;; given a string, a list of reducers and an initial state
+;; returns (accumulated-state . next-position) on success and (initial state . 0) on failure
+;; @str - the string value to be traversed
+;; @reducers - the list of reducers
+;; @state - the initial state
+(define (string-reduce-first str reducers state)
+  (unless (not (null? reducers))
+    (error 'string-reduce-first "at least one reducer is required"))
+  (let reduce ((pos 0)
+	       (reducers reducers)
+	       (state state))
+    (let* ((res (string-reduce (string-make-iterator str pos)
+			       (car reducers)
+			       state))
+	   (new-pos (cdr res)))
+      (cond [(or (> new-pos pos)
+		 (null? (cdr reducers))) res]
+	    [else (reduce pos (cdr reducers) state)]))))
 
-(define digit-accumulator
-  (lambda (acc char)
-    (if (char-numeric? char)
-        (string-append acc (string char))
-        #f)))
+(define (whitespace? c)
+  ((char-one-of '(#\newline #\space #\tab)) c))
 
-(define (char-one-of chars)
-  (lambda (c)
-    (member c chars)))
+(define (whitespace-reducer state char)
+  (if (whitespace? char)
+      state
+      #f))
 
-(define (char-none-of chars)
-  (lambda (c)
-    (not (member c chars))))
-
-(define (pred-or . preds)
-  (lambda (c)
-    (any (lambda (p) (p c)) preds)))
+(define (numeric-reducer state char)
+  (if (char-numeric? char)
+      (string-append state (string char))
+      #f))
